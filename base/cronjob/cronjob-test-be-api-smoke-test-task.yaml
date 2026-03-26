@@ -12,7 +12,7 @@ spec:
       template:
         spec:
           imagePullSecrets:
-            - name: test-pull-secret
+            - name: pull-secret
           containers:
             - name: test-be-api-smoke-test-task
               image: test-be-api:PLACEHOLDER_TAG
