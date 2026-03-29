@@ -9,7 +9,7 @@ spec:
         - name: pull-secret
       containers:
         - name: test-fe
-          image: registry.gitlab.com/sittidet.jo/devops-assignment-test/prd:1.0.4
+          image: registry.gitlab.com/sittidet.jo/devops-assignment-test/prd:1.0.3
           env:
             - name: HOSTNAME
               value: "0.0.0.0"
@@ -29,16 +29,30 @@ spec:
               cpu: 1000m
               memory: 1Gi
 
+          startupProbe:
+            httpGet:
+              path: /
+              port: 8080
+            failureThreshold: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
 
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
 
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
 
----
-apiVersion: argoproj.io/v1alpha1
-kind: Rollout
-metadata:
-  name: test-fe-deployment
-spec:
-  replicas: 3
 
 ---
 apiVersion: v1
@@ -69,7 +83,9 @@ kind: Rollout
 metadata:
   name: test-fe-deployment
 spec:
-
+  analysis:
+    successfulRunHistoryLimit: 1
+    unsuccessfulRunHistoryLimit: 1
   strategy:
     canary:
       stableService: test-fe-service-stable
@@ -77,7 +93,43 @@ spec:
       steps:
         - setWeight: 25
         - pause: { duration: 15s }
+        - analysis:
+            templates:
+              - templateName: test-fe-analysis-prometheus
+            args:
+              - name: url
+                value: "http://test-fe-service-canary-prd:8080"
+              - name: paths
+                value: "GET|/"
+              - name: configMapName
+                value: "test-fe-smoke-test-config-prd"
+              - name: timeout
+                value: "10"
+              - name: count
+                value: "3"
+              - name: smoke_interval
+                value: "5s"
+              - name: failure
+                value: "1"
         - setWeight: 50
+        - analysis:
+            templates:
+              - templateName: test-fe-analysis-prometheus
+            args:
+              - name: url
+                value: "http://test-fe-service-canary-prd:8080"
+              - name: paths
+                value: "GET|/"
+              - name: configMapName
+                value: "test-fe-smoke-test-config-prd"
+              - name: timeout
+                value: "10"
+              - name: count
+                value: "3"
+              - name: smoke_interval
+                value: "5s"
+              - name: failure
+                value: "1"
         - pause: {}
         - setWeight: 100
 
